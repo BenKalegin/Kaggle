@@ -7,7 +7,7 @@ solveRecurrent <- function(x, depth, offset) {
 
     for (r in 1:depth) { 
         for (c in 1:depth) {
-            A[r, c] <- x[offset + (r - 1) + (depth - c)]
+            A[r, c] <- x[offset + (r - 1) + (c-1)]
         }
         b[r] <- x[offset + depth + (r-1)] 
     }
@@ -15,7 +15,7 @@ solveRecurrent <- function(x, depth, offset) {
     if ("matrix" != class(result)) {
         result <- matrix(NA, nrow = depth, ncol = 1);
     }
-    result
+    t(result)
 }
 
 
@@ -25,9 +25,22 @@ solveRecurrent <- function(x, depth, offset) {
 #solveRecurrent(x5, depth = 2, offset = 3)
 
 isRecurrent <- function(x, depth) {
-    s1 <- solveRecurrent(x, depth = depth, offset = 1)
-    s2 <- solveRecurrent(x, depth = depth, offset = 2)
-    identical(s1, s2)
+    s <- solveRecurrent(x, depth = depth, offset = 1)
+    result = TRUE
+    if (!is.na(s)) {
+      for(i in 2:(length(x) - depth)) {
+        value <- 0
+        for (j in 1:depth) {
+          value <- value + x[i+j] * s[j]    
+        }
+        if (value != x[i+depth]) {
+          result = FALSE
+          break;
+        }
+      }
+    }else
+      result = FALSE
+    
 }
 
 

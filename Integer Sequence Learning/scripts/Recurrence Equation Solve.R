@@ -27,30 +27,32 @@ solveRecurrent <- function(x, depth, offset) {
 isRecurrent <- function(x, depth) {
     s <- solveRecurrent(x, depth = depth, offset = 1)
     result = TRUE
-    if (!is.na(s)) {
-      for(i in 2:(length(x) - depth)) {
+    if (!anyNA(s)) {
+      for(i in (depth+1):(length(x) - depth)) {
         value <- 0
         for (j in 1:depth) {
-          value <- value + x[i+j] * s[j]    
+          value <- value + x[i+j-1] * s[j]    
         }
-        if (value != x[i+depth]) {
+        if (is.na(x[i+depth]) || value != x[i+depth]) {
           result = FALSE
           break;
         }
       }
     }else
       result = FALSE
-    
+    result
 }
 
 
 #isRecurrent(x11, depth = 2)
 #isRecurrent(x12, depth = 2)
 
-train <- read.csv("../input/train.csv", stringsAsFactors = FALSE, nrow = 1000)
+train <- read.csv("../input/train.csv", stringsAsFactors = FALSE, nrow = 1000000)
 sequences <- lapply(strsplit(train$Sequence, split = ","), FUN = as.numeric)
 
 rec2 <- lapply(sequences, isRecurrent, depth = 2)
+rec3 <- lapply(sequences, isRecurrent, depth = 3)
+rec4 <- lapply(sequences, isRecurrent, depth = 4)
 
 
 

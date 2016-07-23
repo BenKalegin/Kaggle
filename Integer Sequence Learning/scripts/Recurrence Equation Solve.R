@@ -72,9 +72,26 @@ test$Check2 <- mapply(isRecurrent, test$Sequence, 2, test$Solve2)
 # sum(test$Check2 == TRUE) 2510
 # sum(test$Check2 == FALSE) 111335
 
-#head(test[test$Check2 == TRUE,])
+test$Solve3 <- lapply(test$Sequence, FUN = solveRecurrent, depth = 3)
+test$Check3 <- mapply(isRecurrent, test$Sequence, 3, test$Solve3)
+# sum(test$Check3 == TRUE) 2586
+# sum(test$Check3 == TRUE & test$Check2 == FALSE) 2551
+# test[test$Check3 == TRUE & test$Check2 == TRUE,]
 
-test$Last <- mapply(predictNext, SIMPLIFY = TRUE, test$Sequence, 2, test$Solve2, test$Check2)
+
+test$Last2 <- mapply(predictNext, SIMPLIFY = TRUE, test$Sequence, 2, test$Solve2, test$Check2)
+test$Last3 <- mapply(predictNext, SIMPLIFY = TRUE, test$Sequence, 3, test$Solve3, test$Check3)
+  
+coalesce1a <- function(...) {
+    ans <- ..1
+    for (elt in list(...)[-1]) {
+        i <- which(is.na(ans))
+        ans[i] <- elt[i]
+    }
+    ans
+}
+
+test$Last <- coalesce1a(test$Last2, test$Last3)
 test$Last[is.na(test$Last)] <- 0
 test$Last[abs(test$Last) < 1E8] <- as.integer(test$Last[abs(test$Last) < 1E8])
-write.csv(test[, c("Id", "Last")], "../output/recurrent2.csv", row.names = FALSE) # submission 1
+write.csv(test[, c("Id", "Last")], "../output/recurrent23.csv", row.names = FALSE) # submission 1 : 0.04014 submission 2 (rec23) 0.06096

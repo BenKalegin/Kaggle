@@ -13,3 +13,8 @@ Integer Sequence Learning/scripts/.vs/Input Sequence Learning/v14/.suo
 Integer Sequence Learning/scripts/.vs/Input Sequence Learning/v14/.suo
 *.rdataTmp
 Integer Sequence Learning/output/temp62.rda
+/Integer Sequence Learning/OeisDownload/obj/Debug
+/Integer Sequence Learning/OeisDownload/bin/Debug
+/Integer Sequence Learning/OeisDownload/.vs/OeisDownload/v14
+/Integer Sequence Learning/download
+/Integer Sequence Learning/output/iterations.txt

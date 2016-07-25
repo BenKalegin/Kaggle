@@ -107,7 +107,7 @@ n <- function(prefix, number) {
 }
 
 sink("../output/iterations.txt")
-for (i in 8:100) {
+for (i in 62:100) {
     print(paste("---- iteration ", i, " -----"))
     test[[n("Solve", i)]] <- lapply(test$Sequence, FUN = solveRecurrent, depth = i)
 

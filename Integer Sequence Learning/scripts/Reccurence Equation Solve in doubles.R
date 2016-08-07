@@ -1,19 +1,33 @@
 library(gmp)
 
-solveRecurrent <- function(x, depth) {
-    A <- matrix(NA, nrow = depth + 1, ncol = depth + 1, byrow = TRUE)
-    b <- matrix(NA, nrow = depth + 1, ncol = 1)
-
-    for (r in 1:(depth + 1)) {
-        for (c in 1:depth) {
-            A[r, c] <- x[1 + (r - 1) + (c - 1)]
-        }
-        A[r, depth + 1] <- 1
-        b[r] <- x[1 + depth + (r - 1)]
-    }
-    result <- try(round(solve(A, b), 1));
-    if ("matrix" != class(result)) {
+solveRecurrent <- function(x, depth, takeLast = TRUE) {
+    x <- unlist(x)
+    if (length(x) - 2 * depth < 1) {
         result <- matrix(NA, nrow = depth, ncol = 1);
+    } else {
+        A <- matrix(NA, nrow = depth + 1, ncol = depth + 1, byrow = TRUE)
+        b <- matrix(NA, nrow = depth + 1, ncol = 1)
+        offset <- 1
+        if (takeLast == TRUE) {
+            offset <- length(x) - 2 * depth
+            while ((offset > 1) & (x[offset] > 1e5)) offset <- offset - 1
+        }
+        for (r in 1:(depth + 1)) {
+            for (c in 1:depth) {
+                if (offset + (r - 1) + (c - 1) > length(x)) {
+                    xxx <- 1;
+                    stop();
+                }
+                A[r, c] <- x[offset + (r - 1) + (c - 1)]
+            }
+            A[r, depth + 1] <- 1
+            b[r] <- x[offset + depth + (r - 1)]
+        }
+        solved <- try(solve(A, b))
+        if ("matrix" != class(solved))
+            result <- matrix(NA, nrow = depth, ncol = 1)
+        else
+            result <- round(solved, 1);
     }
     t(result)[1,]
 }
@@ -77,7 +91,7 @@ sink("../output/iterations.txt")
 maxDepth <- limitDepth
 for (i in 1:limitDepth) {
     print(paste("---- iteration ", i, " ----- ", Sys.time()))
-    test[[n("Solve", i)]] <- lapply(test$Sequence, FUN = solveRecurrent, depth = i)
+    test[[n("Solve", i)]] <- sapply(test$Sequence, FUN = solveRecurrent, depth = i, takeLast = TRUE)
 
     test[[n("Check", i)]] <- mapply(isRecurrent, test$BigSequence, i, test[[n("Solve", i)]])
     found <- sum(test[[n("Check", i)]] == TRUE)
@@ -89,7 +103,7 @@ for (i in 1:limitDepth) {
     }
 }
 sink()
-unlink("../output/iterations.txt")
+#unlink("../output/iterations.txt")
 
 
 for (i in 1:maxDepth) {
@@ -114,7 +128,7 @@ for (cn in sapply(c(1:maxDepth), function(x) paste("Last", x, sep = ""))) {
 
 test$Last[is.na(test$Last)] <- 0 # 16936 for 2..62
 #test$Last[abs(test$Last) < 1E9] <- as.integer(test$Last[abs(test$Last) < 1E9])
-write.csv(test[, c("Id", "Last")], "../output/recurrent-exp2.csv", row.names = FALSE)
+write.csv(test[, c("Id", "Last")], "../output/recurrent-exp3.csv", row.names = FALSE)
 
 # experiment 1
 #---- iteration  1  -----  2016-08-03 23:45:35
@@ -127,3 +141,27 @@ write.csv(test[, c("Id", "Last")], "../output/recurrent-exp2.csv", row.names = F
 #[1] "---- found  823  -----  2016-08-05 00:38:14"
 #[1] "---- iteration  2  -----  2016-08-05 00:38:14"
 #[1] "---- found  3000  -----  2016-08-05 00:39:27"
+
+# experiment 3: same as 2 but solve get numbers from the end
+#[1] "---- iteration  1  -----  2016-08-06 18:46:15"
+#[1] "---- found  1267  -----  2016-08-06 18:47:29"
+#[1] "---- iteration  2  -----  2016-08-06 18:47:29"
+#[1] "---- found  2484  -----  2016-08-06 18:49:11"
+
+# experiment 4: same as 3 but move index down until less 1e6
+# [1] "---- iteration  1  -----  2016-08-07 01:57:02"
+# [1] "---- found  1564  -----  2016-08-07 01:57:51"
+# [1] "---- iteration  2  -----  2016-08-07 01:57:51"
+# [1] "---- found  2863  -----  2016-08-07 01:59:00"
+
+# experiment 4-1: same as 3 but move index down until less 1e5
+#[1] "---- iteration  1  -----  2016-08-07 03:07:27"
+#[1] "---- found  1564  -----  2016-08-07 03:08:14"
+#[1] "---- iteration  2  -----  2016-08-07 03:08:14"
+#[1] "---- found  2900  -----  2016-08-07 03:09:25"
+
+exp2 <- read.csv("../output/recurrent-exp2.csv")
+exp4 <- read.csv("../output/recurrent-exp4.csv")
+exp42 <- exp2[exp2$Last != exp4$Last & exp4$Last == 0,]
+write.csv(exp42, "../output/exp4-exp2.csv", row.names = TRUE)
+test[1294,]

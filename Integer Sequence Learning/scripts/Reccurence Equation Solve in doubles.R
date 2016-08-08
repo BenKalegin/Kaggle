@@ -10,7 +10,7 @@ solveRecurrent <- function(x, depth, takeLast = TRUE) {
         offset <- 1
         if (takeLast == TRUE) {
             offset <- length(x) - 2 * depth
-            while ((offset > 1) & (x[offset] > 1e5)) offset <- offset - 1
+            while ((offset > 1) & (abs(x[offset]) > 1e4)) offset <- offset - 1
         }
         for (r in 1:(depth + 1)) {
             for (c in 1:depth) {
@@ -30,6 +30,37 @@ solveRecurrent <- function(x, depth, takeLast = TRUE) {
             result <- round(solved, 1);
     }
     t(result)[1,]
+}
+
+lmRecurrent <- function(x, depth, takeLast = TRUE) {
+    x <- unlist(x)
+    if (length(x) - depth < 1) {
+        result <- matrix(NA, nrow = depth, ncol = 1);
+    } else {
+        if (takeLast) {
+            df <- data.frame(y = tail(x, - depth))
+        }
+        formulaString <- "y~"
+        for (i in 1:depth) {
+            df[[paste0("x", i)]] <- x[i:(length(x) - depth + i - 1)]
+            formulaString <- paste0(formulaString, "+x", i)
+        }
+        formulaString <- sub("~\\+", "~", formulaString)
+
+        fit <- lm(formula(formulaString), df)
+        maxResidual <- max(abs(fit$residuals))
+        
+        df <- list()
+        for(i in 1:depth)
+        {
+            df[[paste0("x",i)]] <- x[length(x)-depth+i]
+        }
+        df <- as.data.frame(df)
+        prediction <- predict(fit, df)
+
+        prediction <- round(prediction)
+    }
+    prediction
 }
 
 isRecurrent <- function(x, depth, s) {
@@ -67,6 +98,8 @@ predictNext <- function(x, depth, s, isRecurrent) {
         value <- NA
     as.character(value)
 }
+
+
 
 #system.time(rec4 <- lapply(sequences, isRecurrent, depth = 4)) # 1.7 on 10000, then 3.07 when value == x[] changed to abs(value - x) < 0.01, but records found 6120 instead of 227
 
@@ -126,9 +159,8 @@ for (cn in sapply(c(1:maxDepth), function(x) paste("Last", x, sep = ""))) {
 }
 
 
-test$Last[is.na(test$Last)] <- 0 # 16936 for 2..62
-#test$Last[abs(test$Last) < 1E9] <- as.integer(test$Last[abs(test$Last) < 1E9])
-write.csv(test[, c("Id", "Last")], "../output/recurrent-exp3.csv", row.names = FALSE)
+test$Last[is.na(test$Last)] <- 0 
+write.csv(test[, c("Id", "Last")], "../output/recurrent-exp4.csv", row.names = FALSE)
 
 # experiment 1
 #---- iteration  1  -----  2016-08-03 23:45:35
@@ -160,8 +192,25 @@ write.csv(test[, c("Id", "Last")], "../output/recurrent-exp3.csv", row.names = F
 #[1] "---- iteration  2  -----  2016-08-07 03:08:14"
 #[1] "---- found  2900  -----  2016-08-07 03:09:25"
 
+# experiment 4-2: same as 3 but move index down until less 1e4
+#[1] "---- iteration  1  -----  2016-08-07 13:41:28"
+#[1] "---- found  1563  -----  2016-08-07 13:42:16"
+#[1] "---- iteration  2  -----  2016-08-07 13:42:16"
+#[1] "---- found  2901  -----  2016-08-07 13:43:29"
+
 exp2 <- read.csv("../output/recurrent-exp2.csv")
 exp4 <- read.csv("../output/recurrent-exp4.csv")
 exp42 <- exp2[exp2$Last != exp4$Last & exp4$Last == 0,]
 write.csv(exp42, "../output/exp4-exp2.csv", row.names = TRUE)
-test[1294,]
+"C:\Users\Ben\Downloads\Solve recurrent exp4.csv"
+
+test$table <- sapply(test$Sequence, FUN = table)
+test$repeats <- mapply(function(table, seq) length(table) < sqrt(length(seq)), test$table, test$Sequence)
+test$periodic <- mapply(function(table, seq) {
+    result <- length(table) < sqrt(length(seq))
+    if (result) {
+        result <- all(abs(diff(unlist(table))) < 2)
+    }
+    result
+}, test$table, test$Sequence)
+#sum(test$periodic == TRUE) 351

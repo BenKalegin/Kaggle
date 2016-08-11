@@ -198,6 +198,7 @@ write.csv(test[, c("Id", "Last")], "../output/recurrent-exp4.csv", row.names = F
 #[1] "---- iteration  2  -----  2016-08-07 13:42:16"
 #[1] "---- found  2901  -----  2016-08-07 13:43:29"
 
+#submission 4-2: score 0.15105
 exp2 <- read.csv("../output/recurrent-exp2.csv")
 exp4 <- read.csv("../output/recurrent-exp4.csv")
 exp42 <- exp2[exp2$Last != exp4$Last & exp4$Last == 0,]

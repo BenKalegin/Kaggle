@@ -1,0 +1,1 @@
+same as submission 14 but solving starts from first index

@@ -10,10 +10,11 @@ solveRecurrentBias <- function(x, depth, takeLast = TRUE) {
         offset <- 1
         if (takeLast == TRUE) {
             offset <- length(x) - 2 * depth
-            while ((offset > 1) & (abs(x[offset]) > 1e4)) offset <- offset - 1
-        }
+            while ((offset > 1) & (abs(x[offset]) > 1e4))
+                offset <- offset - 1
+            }
         for (r in 1:(depth + 1)) {
-            A[r, 1:depth] <- x[(offset + (r - 1)) : (offset + (r - 1) + depth - 1)]
+            A[r, 1:depth] <- x[(offset + (r - 1)):(offset + (r - 1) + depth - 1)]
             #for (c in 1:depth) A[r, c] <- x[offset + (r - 1) + (c - 1)]
             A[r, depth + 1] <- 1
             b[r] <- x[offset + depth + (r - 1)]
@@ -23,7 +24,7 @@ solveRecurrentBias <- function(x, depth, takeLast = TRUE) {
             result <- matrix(NA, nrow = depth, ncol = 1)
         else
             result <- round(solved, 1);
-    }
+        }
     t(result)[1,]
 }
 
@@ -41,7 +42,7 @@ solveRecurrentNobias <- function(x, depth, takeLast = TRUE) {
                 offset <- offset - 1
             }
         for (r in 1:depth) {
-            A[r, 1:depth] <- x[(offset + (r - 1)): (offset + (r - 1) + depth-1)]
+            A[r, 1:depth] <- x[(offset + (r - 1)):(offset + (r - 1) + depth - 1)]
             b[r] <- x[offset + depth + (r - 1)]
         }
         solved <- try(solve(A, b))
@@ -73,6 +74,7 @@ solveRecurrentOld <- function(x, depth) {
     }
     t(result)[1,]
 }
+
 
 lmRecurrent <- function(x, depth, takeLast = TRUE) {
     x <- unlist(x)
@@ -106,28 +108,30 @@ lmRecurrent <- function(x, depth, takeLast = TRUE) {
 }
 
 isRecurrent <- function(x, depth, s, biased = FALSE) {
-    result = TRUE
+    result = FALSE
     if (!anyNA(s)) {
-        for (i in (depth + 1):(length(x) - depth)) {
-            value <- 0
-            for (j in 1:depth) {
-                value <- value + x[i + j - 1] * s[j] 
-            }
-            if (biased == TRUE)
-                value <- value + s[j + 1]
+        ts <- t(head(s, depth))
+        bias = ifelse(biased, tail(s, 1), 0)
+        match <- 0
+        notmatch <- 0
+        for (i in depth:(length(x) - depth)) {
+            value <- ts %*% x[i:(i + depth - 1)] + bias
             if (is.na(value))
                 stop()
-            if ( abs(value - x[i + depth]) > abs(value) / 1E6 ) {
-                result = FALSE
-                break;
+            if (abs(value - x[i + depth]) < abs(value) / 1E8)
+                match <- match + 1
+            else
+                notmatch <- notmatch + 1
             }
-        }
-    } else
-        result = FALSE
+        result <- match > notmatch
+    }
     result
 }
 
+
 predictNext <- function(x, depth, s, isRecurrent, biased = FALSE) {
+    #print(id)
+    s <- unlist(s)
     if (isRecurrent) {
         i <- length(x) - depth + 1;
         value <- as.bigz(0)
@@ -138,10 +142,11 @@ predictNext <- function(x, depth, s, isRecurrent, biased = FALSE) {
             value <- value + as.bigz(round(s[j + 1]))
         if (is.na(value))
             stop()
-    } else
-        value <- NA
-    as.character(value)
+        } else
+            value <- NA
+        as.character(value)
 }
+
 
 
 
@@ -163,26 +168,21 @@ n <- function(prefix, number) {
     paste(prefix, i, sep = "")
 }
 
-limitDepth <- 3
+limitDepth <- 70
 
 sink("../output/iterations.txt")
 maxDepth <- limitDepth
 for (i in 1:limitDepth) {
     print(paste("---- iteration ", i, " ----- ", Sys.time()))
-    test[[n("Solve0_", i)]] <- lapply(test$Sequence, FUN = solveRecurrentNobias, depth = i, takeLast = TRUE)
-    test[[n("Solve1_", i)]] <- lapply(test$Sequence, FUN = solveRecurrentBias, depth = i, takeLast = TRUE)
+    test[[n("Solve0_", i)]] <- lapply(test$Sequence, FUN = solveRecurrentNobias, depth = i, takeLast = FALSE)
+    test[[n("Solve1_", i)]] <- lapply(test$Sequence, FUN = solveRecurrentBias, depth = i, takeLast = FALSE)
 
-    test[[n("Check0_", i)]] <- mapply(isRecurrent, test$BigSequence, i, test[[n("Solve0_", i)]], FALSE)
-    test[[n("Check1_", i)]] <- mapply(isRecurrent, test$BigSequence, i, test[[n("Solve1_", i)]], TRUE)
+    test[[n("Check0_", i)]] <- mapply(isRecurrent, test$Sequence, i, test[[n("Solve0_", i)]], FALSE)
+    test[[n("Check1_", i)]] <- mapply(isRecurrent, test$Sequence, i, test[[n("Solve1_", i)]], TRUE)
     test[[n("Check_", i)]] <- test[[n("Check0_", i)]] | test[[n("Check1_", i)]]
 
     found <- sum(test[[n("Check_", i)]] == TRUE)
     print(paste("---- found ", found, " ----- ", Sys.time()))
-
-    if (found == 0) {
-        maxDepth <- i
-        break;
-    }
 }
 #unlink("../output/iterations.txt")
 
@@ -210,8 +210,19 @@ for (cn in sapply(c(1:maxDepth), function(x) paste("Last_", x, sep = ""))) {
 }
 
 
-test$Last[is.na(test$Last)] <- 0 
 
+test$Repeated <- sapply(test$Sequence, function(x) {
+    x <- unlist(x)
+    value <- (length(x) > 1) & (x[length(x)] == x[length(x) - 1])
+    value
+})
+
+sum(test$Repeated) #5524
+r <- which(test$Repeated == TRUE & is.na(test$Last))
+test$Last[r] <- sapply(test$Sequence[r], tail, 1)
+
+test$Last[is.na(test$Last)] <- 0
+write.csv(test[, c("Id", "Last")], "../output/recurrent-exp6.csv", row.names = FALSE)
 
 # experiment 1
 #---- iteration  1  -----  2016-08-03 23:45:35
@@ -256,97 +267,5 @@ test$Last[is.na(test$Last)] <- 0
 
 #exp6: isRecurrent 1e-3 tolerance
 
-exp62 <- read.csv("../output/recurrent62.csv")
-exp5 <- read.csv("../output/recurrent-exp5.csv")
-exp562 <- exp62[exp62$Last != exp5$Last & exp5$Last == 0,]
-write.csv(exp562, "../output/exp5-62.csv", row.names = TRUE)
-
-exp5 <- read.csv("../output/recurrent-exp5.csv")
-exlm <- read.csv("../output/linearPrevious10WithModeFallback.csv")
-exp5lm <- exlm[exlm$Last != exp5$Last & exp5$Last == 0,]
-write.csv(exp5lm, "../output/exp5-lm.csv", row.names = TRUE)
 
 
-"210",418,324259173170675968
-x <- unlist(test$Sequence[210])
-s <- solveRecurrentNobias(x, 3)
-isRecurrent(x, 3, s, TRUE)
-
-as.character(t(s) %*% x[15:(length(s)+14)])
-as.character(x)
-
-
-takeLast <- TRUE
-A <- matrix(NA, nrow = depth, ncol = depth, byrow = TRUE)
-b <- matrix(NA, nrow = depth, ncol = 1)
-offset <- 1
-x <- unlist(x)
-if (takeLast == TRUE) {
-    offset <- length(x) - 2 * depth
-    while ((offset > 1) & (abs(x[offset]) > 1e4))
-        offset <- offset - 1
-}
-for (r in 1:depth) {
-    A[r, 1:depth] <- x[(offset + (r - 1)):(offset + (r - 1) + depth - 1)]
-    b[r] <- x[offset + depth + (r - 1)]
-}
-
-df <- data.frame(y = tail(x, - depth))
-
-# lm fit
-formulaString <- "y~"
-for (i in 1:depth) {
-    df[[paste0("x", i)]] <- x[i:(length(x) - depth + i - 1)]
-    formulaString <- paste0(formulaString, "+x", i)
-}
-formulaString <- sub("~\\+", "~", formulaString)
-fit <- lm(formula(formulaString), df)
-
-
-# svd https://www.ecse.rpi.edu/~qji/CV/svd_review.pdf
-a.svd <- svd(A)
-ds <- diag(1 / a.svd$d[1:depth])
-u <- a.svd$u
-v <- a.svd$v
-us <- as.matrix(u[, 1:depth])
-vs <- as.matrix(v[, 1:depth])
-bs <- unlist(b)
-xs <- vs %*% ds %*% (t(us) %*% bs)
-round(xs, 1)
-A %*% xs - bs
-(a.ginv <- vs %*% ds %*% (t(us) %*% bs))
-a.ginv %*% A
-#(0, 10, 0, -15, 0, 7, 0, -1)
-
-k = 15
-x[k] * x[k-2] / (x[k-1]^2)
-
-
-#exact repeat at the end
-test$Repeated <- sapply(test$Sequence, function(x) {
-    x <- unlist(x)
-    value <- (length(x) > 1) & (x[length(x)] == x[length(x) - 1])
-    value
-})
-sum(unlist(test$Repeated)) #5524
-
-#powers
-x <- test$Sequence[327] # id 649
-x <- unlist(x)
-solveRecurrentBias(x^(1 / 8), 2, TRUE) # 0 1 2
-
-#repeatable groups
-test$table <- sapply(test$Sequence, FUN = table)
-test$repeats <- mapply(function(table, seq) length(table) < sqrt(length(seq)), test$table, test$Sequence)
-test$periodic <- mapply(function(table, seq) {
-    result <- length(table) < sqrt(length(seq))
-    if (result) {
-        result <- all(abs(diff(unlist(table))) < 2)
-    }
-    result
-}, test$table, test$Sequence)
-
-
-t(A) %*% A
-
-#sum(test$periodic == TRUE) 351

@@ -28,6 +28,11 @@ startsWith = function(x, prefix) {
     suppressWarnings(substr(x, 1L, nchar(prefix)) == prefix)
 }
 
+lookupLast <- function(id, lookup) {
+
+    lookup$
+}
+
 searchLookup <- function(value, lookup) {
     low = 1
     high = nrow(lookup)

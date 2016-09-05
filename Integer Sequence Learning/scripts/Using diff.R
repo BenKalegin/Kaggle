@@ -33,10 +33,15 @@ ratio(s1)
 
 4.701562 3 8
 
-test$ratio2 <- lapply(test$Sequence, function(x) {
+test$ratio2 <- sapply(test$Sequence, function(x) {
     r1 = x[length(x)] / x[length(x) - 1]
     r2 = x[length(x)- 1] / x[length(x)-2]
     r1 / r2 - 1
 })
 
-sum(abs(unlist(test$ratio2)) < 0.01, na.rm = TRUE) # 36770
+rational <- which(abs(unlist(test$ratio2)) < 0.01)
+length(rational) # 36770
+head(test[rational,])
+exlm[5,]
+
+head(test$ratio2[rational])

@@ -1,4 +1,6 @@
+# tried both first and last approx
 library(gmp)
+#library(lapack, warn.conflicts = FALSE, quietly = TRUE)
 
 solveRecurrentBias <- function(x, depth, takeLast = TRUE) {
     x <- unlist(x)
@@ -75,6 +77,35 @@ solveRecurrentOld <- function(x, depth) {
     t(result)[1,]
 }
 
+lmRecurrent <- function(x, depth, takeLast = TRUE) {
+    x <- unlist(x)
+    if (length(x) - depth < 1) {
+        result <- matrix(NA, nrow = depth, ncol = 1);
+    } else {
+        if (takeLast) {
+            df <- data.frame(y = tail(x, - depth))
+        }
+        formulaString <- "y~"
+        for (i in 1:depth) {
+            df[[paste0("x", i)]] <- x[i:(length(x) - depth + i - 1)]
+            formulaString <- paste0(formulaString, "+x", i)
+        }
+        formulaString <- sub("~\\+", "~", formulaString)
+
+        fit <- lm(formula(formulaString), df)
+        maxResidual <- max(abs(fit$residuals))
+
+        df <- list()
+        for (i in 1:depth) {
+            df[[paste0("x", i)]] <- x[length(x) - depth + i]
+        }
+        df <- as.data.frame(df)
+        prediction <- predict(fit, df)
+
+        prediction <- round(prediction)
+    }
+    prediction
+}
 
 isRecurrent <- function(x, depth, s, biased = FALSE) {
     result = FALSE
@@ -92,11 +123,10 @@ isRecurrent <- function(x, depth, s, biased = FALSE) {
             else
                 notmatch <- notmatch + 1
             }
-        result <- match > notmatch
+        result <- match > notmatch * 2
     }
     result
 }
-
 
 predictNext <- function(x, depth, s, isRecurrent, biased = FALSE) {
     #print(id)
@@ -118,11 +148,9 @@ predictNext <- function(x, depth, s, isRecurrent, biased = FALSE) {
 
 
 
-
 #system.time(rec4 <- lapply(sequences, isRecurrent, depth = 4)) # 1.7 on 10000, then 3.07 when value == x[] changed to abs(value - x) < 0.01, but records found 6120 instead of 227
 
 test <- read.csv("../input/test.csv", stringsAsFactors = FALSE, nrow = 10000000)
-test$Sequence[210] <- gsub("38280596832649216", "38280596832649217", test$Sequence[210])
 test$BigSequence <- sapply(strsplit(test$Sequence, split = ","), FUN = as.bigz)
 test$Sequence <- sapply(strsplit(test$Sequence, split = ","), FUN = as.numeric)
 # length(testseq) == 113845
@@ -145,14 +173,19 @@ for (i in 1:limitDepth) {
     print(paste("---- iteration ", i, " ----- ", Sys.time()))
     test[[n("Solve0_", i)]] <- lapply(test$Sequence, FUN = solveRecurrentNobias, depth = i, takeLast = FALSE)
     test[[n("Solve1_", i)]] <- lapply(test$Sequence, FUN = solveRecurrentBias, depth = i, takeLast = FALSE)
+    test[[n("SolveL0_", i)]] <- lapply(test$Sequence, FUN = solveRecurrentNobias, depth = i, takeLast = TRUE)
+    test[[n("SolveL1_", i)]] <- lapply(test$Sequence, FUN = solveRecurrentBias, depth = i, takeLast = TRUE)
 
     test[[n("Check0_", i)]] <- mapply(isRecurrent, test$Sequence, i, test[[n("Solve0_", i)]], FALSE)
     test[[n("Check1_", i)]] <- mapply(isRecurrent, test$Sequence, i, test[[n("Solve1_", i)]], TRUE)
-    test[[n("Check_", i)]] <- test[[n("Check0_", i)]] | test[[n("Check1_", i)]]
+    test[[n("CheckL0_", i)]] <- mapply(isRecurrent, test$Sequence, i, test[[n("SolveL0_", i)]], FALSE)
+    test[[n("CheckL1_", i)]] <- mapply(isRecurrent, test$Sequence, i, test[[n("SolveL1_", i)]], TRUE)
+    test[[n("Check_", i)]] <- test[[n("Check0_", i)]] | test[[n("Check1_", i)]] | test[[n("CheckL0_", i)]] | test[[n("CheckL1_", i)]]
 
     found <- sum(test[[n("Check_", i)]] == TRUE)
     print(paste("---- found ", found, " ----- ", Sys.time()))
 }
+sink()
 #unlink("../output/iterations.txt")
 
 
@@ -166,75 +199,23 @@ coalesce1a <- function(...) {
 }
 
 
-
 for (i in 1:maxDepth) {
     print(paste("Predicting ", i))
     test[[n("Last0_", i)]] <- mapply(predictNext, SIMPLIFY = TRUE, test$BigSequence, i, test[[n("Solve0_", i)]], test[[n("Check0_", i)]], FALSE)
     test[[n("Last1_", i)]] <- mapply(predictNext, SIMPLIFY = TRUE, test$BigSequence, i, test[[n("Solve1_", i)]], test[[n("Check1_", i)]], TRUE)
-    test[[n("Last_", i)]] <- mapply(coalesce1a, test[[n("Last0_", i)]], test[[n("Last1_", i)]])
+    test[[n("LastL0_", i)]] <- mapply(predictNext, SIMPLIFY = TRUE, test$BigSequence, i, test[[n("SolveL0_", i)]], test[[n("CheckL0_", i)]], FALSE)
+    test[[n("LastL1_", i)]] <- mapply(predictNext, SIMPLIFY = TRUE, test$BigSequence, i, test[[n("SolveL1_", i)]], test[[n("CheckL1_", i)]], TRUE)
+    test[[n("Last_", i)]] <- mapply(coalesce1a, test[[n("Last0_", i)]], test[[n("Last1_", i)]], test[[n("LastL1_", i)]], test[[n("LastL0_", i)]])
 }
+
 test$Last <- NA
 for (cn in sapply(c(1:maxDepth), function(x) paste("Last_", x, sep = ""))) {
     test$Last <- coalesce1a(test$Last, test[[cn]])
 }
 
 
-
-test$Repeated <- sapply(test$Sequence, function(x) {
-    x <- unlist(x)
-    value <- (length(x) > 1) & (x[length(x)] == x[length(x) - 1])
-    value
-})
-
-sum(test$Repeated) #5524
-r <- which(test$Repeated == TRUE & is.na(test$Last))
-test$Last[r] <- sapply(test$Sequence[r], tail, 1)
-
 test$Last[is.na(test$Last)] <- 0
 write.csv(test[, c("Id", "Last")], "../output/recurrent-exp6.csv", row.names = FALSE)
-
-# experiment 1
-#---- iteration  1  -----  2016-08-03 23:45:35
-#---- found  2402  -----  2016-08-03 23:45:52
-#---- iteration  2  -----  2016-08-03 23:45:52
-#---- found  6739  -----  2016-08-03 23:46:11
-
-# experiment 2: changed check and predict using bigz
-#[1] "---- iteration  1  -----  2016-08-05 00:37:22"
-#[1] "---- found  823  -----  2016-08-05 00:38:14"
-#[1] "---- iteration  2  -----  2016-08-05 00:38:14"
-#[1] "---- found  3000  -----  2016-08-05 00:39:27"
-
-# experiment 3: same as 2 but solve get numbers from the end
-#[1] "---- iteration  1  -----  2016-08-06 18:46:15"
-#[1] "---- found  1267  -----  2016-08-06 18:47:29"
-#[1] "---- iteration  2  -----  2016-08-06 18:47:29"
-#[1] "---- found  2484  -----  2016-08-06 18:49:11"
-
-# experiment 4: same as 3 but move index down until less 1e6
-# [1] "---- iteration  1  -----  2016-08-07 01:57:02"
-# [1] "---- found  1564  -----  2016-08-07 01:57:51"
-# [1] "---- iteration  2  -----  2016-08-07 01:57:51"
-# [1] "---- found  2863  -----  2016-08-07 01:59:00"
-
-# experiment 4-1: same as 3 but move index down until less 1e5
-#[1] "---- iteration  1  -----  2016-08-07 03:07:27"
-#[1] "---- found  1564  -----  2016-08-07 03:08:14"
-#[1] "---- iteration  2  -----  2016-08-07 03:08:14"
-#[1] "---- found  2900  -----  2016-08-07 03:09:25"
-
-# experiment 4-2: same as 3 but move index down until less 1e4
-#[1] "---- iteration  1  -----  2016-08-07 13:41:28"
-#[1] "---- found  1563  -----  2016-08-07 13:42:16"
-#[1] "---- iteration  2  -----  2016-08-07 13:42:16"
-#[1] "---- found  2901  -----  2016-08-07 13:43:29"
-
-#submission 4-2: score 0.15105
-
-#submission 5-1: score 0.15371
-#submission 5-2(15): score 0.15453 ???? ?? 5-1 ??? 
-
-#exp6: isRecurrent 1e-3 tolerance
 
 
 

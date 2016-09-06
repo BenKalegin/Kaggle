@@ -116,7 +116,49 @@ predictNext <- function(x, depth, s, isRecurrent, biased = FALSE) {
         as.character(value)
 }
 
+makeRecurrentMatrix <- function(x, depth, takeLast = TRUE) {
+    x <- unlist(x)
+    A <- matrix(NA, nrow = depth, ncol = depth, byrow = TRUE)
+    b <- matrix(NA, nrow = depth, ncol = 1)
 
+    if (length(x) - 2 * depth > 1) {
+        offset <- 1
+        if (takeLast == TRUE) {
+            offset <- length(x) - 2 * depth
+            while ((offset > 1) & (abs(x[offset]) > 1e4))
+                offset <- offset - 1
+            }
+        for (r in 1:depth) {
+            A[r, 1:depth] <- x[(offset + (r - 1)):(offset + (r - 1) + depth - 1)]
+            b[r] <- x[offset + depth + (r - 1)]
+        }
+
+    }
+    list(A, b)
+}
+
+
+solveSvd <- function(x, depth, takeLast = TRUE) {
+    Ab <- makeRecurrentMatrix(x, i, takeLast)
+    result <- matrix(NA, nrow = depth, ncol = 1)
+    if (!anyNA(Ab)) {
+        A <- Ab[[1]]
+        b <- Ab[[2]]
+        a.svd <- svd(A)
+        if (!(0 %in% a.svd$d)) {
+            ds <- diag(1 / a.svd$d[1:depth])
+            u <- a.svd$u
+            v <- a.svd$v
+            us <- as.matrix(u[, 1:depth])
+            vs <- as.matrix(v[, 1:depth])
+            bs <- unlist(b)
+            xs <- vs %*% ds %*% (t(us) %*% bs)
+            round(xs, 1)
+            result <- unlist(a.ginv <- vs %*% ds %*% (t(us) %*% bs))
+        }
+    }
+    result
+}
 
 
 #system.time(rec4 <- lapply(sequences, isRecurrent, depth = 4)) # 1.7 on 10000, then 3.07 when value == x[] changed to abs(value - x) < 0.01, but records found 6120 instead of 227
@@ -139,21 +181,20 @@ n <- function(prefix, number) {
 
 limitDepth <- 70
 
-sink("../output/iterations.txt")
 maxDepth <- limitDepth
 for (i in 1:limitDepth) {
     print(paste("---- iteration ", i, " ----- ", Sys.time()))
-    test[[n("Solve0_", i)]] <- lapply(test$Sequence, FUN = solveRecurrentNobias, depth = i, takeLast = FALSE)
-    test[[n("Solve1_", i)]] <- lapply(test$Sequence, FUN = solveRecurrentBias, depth = i, takeLast = FALSE)
-
-    test[[n("Check0_", i)]] <- mapply(isRecurrent, test$Sequence, i, test[[n("Solve0_", i)]], FALSE)
-    test[[n("Check1_", i)]] <- mapply(isRecurrent, test$Sequence, i, test[[n("Solve1_", i)]], TRUE)
-    test[[n("Check_", i)]] <- test[[n("Check0_", i)]] | test[[n("Check1_", i)]]
-
+    for (j in 1:nrow(test)) {
+        solve0 <- solveSvd[test$Sequence[j]], depth = i, takeLast = FALSE)
+        if (isRecurrent(test$Sequence[j], i, test[j, n("Solve0_", i)], FALSE))
+        solve1 <- solveSvd[test$Sequence[j]], depth = i, takeLast = TRUE)
+        
+        test[j, n("Check1_", i)] <- isRecurrent(test$Sequence[j], i, test[j, n("Solve1_", i)], TRUE)
+        test[[n("Check_", i)]] <- test[[n("Check0_", i)]] | test[[n("Check1_", i)]]
+    }
     found <- sum(test[[n("Check_", i)]] == TRUE)
     print(paste("---- found ", found, " ----- ", Sys.time()))
 }
-#unlink("../output/iterations.txt")
 
 
 coalesce1a <- function(...) {
@@ -191,7 +232,7 @@ r <- which(test$Repeated == TRUE & is.na(test$Last))
 test$Last[r] <- sapply(test$Sequence[r], tail, 1)
 
 test$Last[is.na(test$Last)] <- 0
-write.csv(test[, c("Id", "Last")], "../output/recurrent-exp6.csv", row.names = FALSE)
+write.csv(test[, c("Id", "Last")], "../output/recurrent-exp7.csv", row.names = FALSE)
 
 # experiment 1
 #---- iteration  1  -----  2016-08-03 23:45:35

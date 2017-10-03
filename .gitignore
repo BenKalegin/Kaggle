@@ -19,3 +19,5 @@ Integer Sequence Learning/output/temp62.rda
 /Integer Sequence Learning/download
 /Integer Sequence Learning/output/iterations.txt
 /Integer Sequence Learning/output/recurrent2-1.csv
+*.cache
+.vs/

@@ -1,6 +1,7 @@
-#[Integer Sequence Learning](https://www.kaggle.com/c/integer-sequence-learning)
+#Integer Sequence Learning
 
 
+[Official competition site, I was 27th](https://www.kaggle.com/c/integer-sequence-learning) 
 
 1, 2, 3, 4, 5, 7?!
 

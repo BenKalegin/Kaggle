@@ -1,1 +1,2 @@
-# My participation in Kaggle competition, one folder per competition
+# Kaggle 
+My participation in Kaggle competitions, one folder per competition

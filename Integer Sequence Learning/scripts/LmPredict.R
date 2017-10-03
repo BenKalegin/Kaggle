@@ -24,6 +24,7 @@ lmRecurrent <- function(x, depth, takeLast = TRUE) {
         prediction <- predict(fit, df)
 
         prediction <- round(prediction)
+
     }
     prediction
 }
